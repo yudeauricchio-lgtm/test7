@@ -37,8 +37,6 @@ local targetPart, fovRadius, aimColorFovRadius = "Head", 150, 100
 local aimColorPrediction, aimColorStrength = 0.08, 0.85
 local aimColorDisfarceEnabled, smoothingFactor, minimized, showFps, tpEnabled = false, 0.7, false, false, false
 local toggleKey, switchTargetKey = Enum.KeyCode.Insert, Enum.KeyCode.T
-local aimbotKey = Enum.UserInputType.MouseButton2
-local aimColorActivation = Enum.UserInputType.MouseButton1
 local currentTitleColor = Color3.fromRGB(255, 140, 0)
 local savedPosition, panelLoaded, anonimatoEnabled = nil, false, false
 local clickCount, lastClickTime, nextFireTime = 0, 0, 0
@@ -853,7 +851,6 @@ parentFovFrames()
 safeSpawn(function() safeWait(); parentFovFrames() end)
 safeSpawn(function() safeWait(); safeWait(); parentFovFrames() end)
 
--- === Texto do Alvo DENTRO do Painel ===
 aimbotTargetFrame = Instance.new("TextLabel", AimColorTabFrame)
 aimbotTargetFrame.Name = "AlvoDisplay"
 aimbotTargetFrame.Size = UDim2.new(1, -10, 0, 24)
@@ -1727,7 +1724,9 @@ RunService.RenderStepped:Connect(function()
             aimbotTargetFrame.Visible = false
         end
     else
-        aimbotTargetFrame.Visible = false
+        if not (aimColorEnabled and rmbDown and showAimColorTarget) then
+            aimbotTargetFrame.Visible = false
+        end
     end
 
     if aimColorEnabled and rmbDown and not overPanel then
