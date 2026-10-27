@@ -1713,7 +1713,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- AIMCOLOR (BOTÃO ESQUERDO) - GRUDA NO ALVO ENQUANTO SEGURAR O MOUSE
+    -- AIMCOLOR (BOTÃO ESQUERDO) - GRUDA ENQUANTO SEGURAR O MOUSE
     if aimColorEnabled and lmbDown and not overPanel then
         local parts
         if aimColorDisfarceEnabled then
@@ -1765,15 +1765,33 @@ RunService.RenderStepped:Connect(function()
 
                 local dx = sp.X - mp.X
                 local dy = sp.Y - mp.Y
-                -- GRUDAR: força total (disfarce usa 0.3, normal usa 1.0)
-                local finalStrength = aimColorDisfarceEnabled and 0.3 or 1.0
-                
-                if setmousepos then
-                    setmousepos(mp.X + (dx * finalStrength), mp.Y + (dy * finalStrength))
-                elseif mousemoverel then
-                    mousemoverel(dx * finalStrength, dy * finalStrength)
+
+                if aimColorDisfarceEnabled then
+                    -- ===== DISFARCE: parece mira humana boa =====
+                    -- desliza rápido até o alvo, com aceleração, sem teleportar
+                    local dist = math.sqrt(dx * dx + dy * dy)
+                    if dist > 1 then
+                        local maxStep = 35
+                        local accel = math.clamp(dist / 120, 0.35, 1)
+                        local step = math.min(dist, maxStep) * accel
+                        local nx = dx / dist
+                        local ny = dy / dist
+                        if setmousepos then
+                            setmousepos(mp.X + nx * step, mp.Y + ny * step)
+                        elseif mousemoverel then
+                            mousemoverel(nx * step, ny * step)
+                        end
+                    end
+                else
+                    -- ===== NORMAL: gruda travado =====
+                    if setmousepos then
+                        setmousepos(mp.X + dx, mp.Y + dy)
+                    elseif mousemoverel then
+                        mousemoverel(dx, dy)
+                    end
                 end
                 
+                -- Auto-fire só no modo normal (disfarce não atira sozinho)
                 if not aimColorDisfarceEnabled and tick() >= nextFireTime then
                     safeSpawn(function()
                         local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
