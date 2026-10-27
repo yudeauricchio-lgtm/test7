@@ -1163,7 +1163,9 @@ local function updateLifeESP(player)
 
     local hconn = hum.HealthChanged:Connect(function() updateLifeVisual(player) end)
     local dconn = hum.Died:Connect(function()
-        cleanupLifeESP(player)
+        if lifeObjects[player] and lifeObjects[player].billboard then
+            lifeObjects[player].billboard.Enabled = false
+        end
         local rc = player.CharacterAdded:Connect(function()
             rc:Disconnect()
             safeSpawn(function() safeWait(); updateLifeESP(player) end)
@@ -1439,7 +1441,9 @@ end
 local function removeESP(player)
     local d = espBillboardObjects[player]
     if d then pcall(function() d.gui:Destroy() end); espBillboardObjects[player] = nil end
-endlocal function clearAllESP()
+end
+
+local function clearAllESP()
     for p, d in pairs(espBillboardObjects) do pcall(function() d.gui:Destroy() end) end
     espBillboardObjects = {}
 end
@@ -1480,16 +1484,11 @@ local function updateAllESP()
             if not espBillboardObjects[p] then createESP(p) end
             if espGlowEnabled then updateGlowForPlayer(p) end
             if espLifeEnabled then
-                if not lifeObjects[p] or (lifeObjects[p].character and lifeObjects[p].character ~= p.Character) then
+                if not lifeObjects[p] or not lifeObjects[p].billboard or not lifeObjects[p].billboard.Parent then
                     updateLifeESP(p)
-                end
-                if lifeObjects[p] and lifeObjects[p].billboard then
-                    if not lifeObjects[p].billboard.Parent then
-                        updateLifeESP(p)
-                    else
-                        lifeObjects[p].billboard.Enabled = true
-                        updateLifeVisual(p)
-                    end
+                else
+                    lifeObjects[p].billboard.Enabled = true
+                    updateLifeVisual(p)
                 end
             end
         end
@@ -1731,7 +1730,6 @@ RunService.RenderStepped:Connect(function()
         aimbotTargetFrame.Visible = false
     end
 
-    -- ===== AIMCOLOR (SEGURAR BOTÃO DIREITO PARA O MOUSE GRUDAR NO PLAYER) =====
     if aimColorEnabled and rmbDown and not overPanel then
         local parts = {"Head", "UpperTorso", "Torso", "HumanoidRootPart"}
         local mp = UserInputService:GetMouseLocation()
@@ -1770,13 +1768,14 @@ RunService.RenderStepped:Connect(function()
                     end
                 end
 
+                local dx = sp.X - mp.X
+                local dy = sp.Y - mp.Y
+                local finalStrength = aimColorDisfarceEnabled and (aimColorStrength * 0.3) or 1.0
+                
                 if setmousepos then
-                    local strength = aimColorDisfarceEnabled and 0.2 or aimColorStrength
-                    local targetX = mp.X + ((sp.X - mp.X) * strength)
-                    local targetY = mp.Y + ((sp.Y - mp.Y) * strength)
-                    pcall(function()
-                        setmousepos(targetX, targetY)
-                    end)
+                    setmousepos(mp.X + (dx * finalStrength), mp.Y + (dy * finalStrength))
+                elseif mousemoverel then
+                    mousemoverel(dx * finalStrength, dy * finalStrength)
                 end
                 
                 if not aimColorDisfarceEnabled and tick() >= nextFireTime then
