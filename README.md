@@ -43,6 +43,8 @@ local clickCount, lastClickTime, nextFireTime = 0, 0, 0
 local ignoreMouse1Release = false
 local frameCount, lastTime, currentFps, fpsLabel, espUpdateTimer = 0, tick(), 0, nil, 0
 
+local lmbDown = false
+
 local hitboxExpanderEnabled = false
 local hitboxSize = 5
 local hitboxTransparency = 0.4
@@ -764,6 +766,15 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         end
     end
 end)
+
+-- ===== CONTROLE REAL DO BOTÃO ESQUERDO (XENO-COMPATÍVEL) =====
+do
+    local mouse = LocalPlayer:GetMouse()
+    if mouse then
+        mouse.Button1Down:Connect(function() lmbDown = true end)
+        mouse.Button1Up:Connect(function() lmbDown = false end)
+    end
+end
 
 local function createCircleFrame(name, radius, initialPos)
     local holder = Instance.new("Frame")
@@ -1675,10 +1686,7 @@ RunService.RenderStepped:Connect(function()
     end
 
     local rmbDown = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
-    -- CORREÇÃO: lê SÓ o estado real do botão esquerdo (segurou = true, soltou = false)
-    local lmbDown = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
 
-    -- AIMBOT (BOTÃO DIREITO - SÓ NA PARTE ESCOLHIDA)
     if aimbotEnabled and rmbDown and not overPanel then
         local target, tp = getClosestPart(fovRadius)
         if target then
@@ -1698,7 +1706,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- AIMCOLOR (BOTÃO ESQUERDO) - GRUDA ENQUANTO SEGURAR O MOUSE
+    -- AIMCOLOR (BOTÃO ESQUERDO) - usa lmbDown (Mouse.Button1Down/Up)
     if aimColorEnabled and lmbDown and not overPanel then
         local parts
         if aimColorDisfarceEnabled then
