@@ -37,6 +37,8 @@ local targetPart, fovRadius, aimColorFovRadius = "Head", 150, 100
 local aimColorPrediction, aimColorStrength = 0.08, 0.85
 local aimColorDisfarceEnabled, smoothingFactor, minimized, showFps, tpEnabled = false, 0.7, false, false, false
 local toggleKey, switchTargetKey = Enum.KeyCode.Insert, Enum.KeyCode.T
+local aimbotKey = Enum.UserInputType.MouseButton2
+local aimColorActivation = Enum.UserInputType.MouseButton1
 local currentTitleColor = Color3.fromRGB(255, 140, 0)
 local savedPosition, panelLoaded, anonimatoEnabled = nil, false, false
 local clickCount, lastClickTime, nextFireTime = 0, 0, 0
@@ -851,24 +853,22 @@ parentFovFrames()
 safeSpawn(function() safeWait(); parentFovFrames() end)
 safeSpawn(function() safeWait(); safeWait(); parentFovFrames() end)
 
-aimbotTargetFrame = Instance.new("Frame", ScreenGui)
-aimbotTargetFrame.Size = UDim2.new(0, 300, 0, 40)
-aimbotTargetFrame.Position = UDim2.new(0.5, 0, 0, 40)
-aimbotTargetFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-aimbotTargetFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+-- === Texto do Alvo DENTRO do Painel ===
+aimbotTargetFrame = Instance.new("TextLabel", AimColorTabFrame)
+aimbotTargetFrame.Name = "AlvoDisplay"
+aimbotTargetFrame.Size = UDim2.new(1, -10, 0, 24)
+aimbotTargetFrame.Position = UDim2.new(0, 5, 1, -30)
+aimbotTargetFrame.BackgroundColor3 = COLORS.SECONDARY
 aimbotTargetFrame.BackgroundTransparency = 0.5
 aimbotTargetFrame.BorderSizePixel = 0
-aimbotTargetFrame.Visible = false
-aimbotTargetFrame.ZIndex = 50
-local atc = Instance.new("UICorner", aimbotTargetFrame)
-atc.CornerRadius = UDim.new(0, 12)
-aimbotTargetLabel = Instance.new("TextLabel", aimbotTargetFrame)
-aimbotTargetLabel.Size = UDim2.new(1, 0, 1, 0)
-aimbotTargetLabel.BackgroundTransparency = 1
-aimbotTargetLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-aimbotTargetLabel.Font = Enum.Font.GothamBlack
-aimbotTargetLabel.TextSize = 16
-aimbotTargetLabel.Text = ""
+aimbotTargetFrame.Text = "Alvo: Nenhum"
+aimbotTargetFrame.TextColor3 = Color3.fromRGB(255, 255, 255)
+aimbotTargetFrame.Font = Enum.Font.GothamBlack
+aimbotTargetFrame.TextSize = 13
+aimbotTargetFrame.TextXAlignment = Enum.TextXAlignment.Center
+aimbotTargetFrame.Visible = true
+aimbotTargetFrame.ZIndex = 10
+aimbotTargetLabel = aimbotTargetFrame
 
 local function createFPSDisplay()
     if fpsLabel then pcall(function() fpsLabel:Destroy() end); fpsLabel = nil end
@@ -1719,7 +1719,7 @@ RunService.RenderStepped:Connect(function()
             smoothLookAt(target)
             if showAimbotTarget and tp then
                 aimbotTargetFrame.Visible = true
-                aimbotTargetLabel.Text = "Aimbot: " .. tp.Name .. " (" .. target.Name .. ")"
+                aimbotTargetFrame.Text = "Aimbot: " .. tp.Name .. " (" .. target.Name .. ")"
             else
                 aimbotTargetFrame.Visible = false
             end
@@ -1766,7 +1766,7 @@ RunService.RenderStepped:Connect(function()
             if on then
                 if showAimColorTarget then
                     aimbotTargetFrame.Visible = true
-                    aimbotTargetLabel.Text = "AimColor: " .. closestPlayer.Name .. " (" .. closest.Name .. ")"
+                    aimbotTargetFrame.Text = "AimColor: " .. closestPlayer.Name .. " (" .. closest.Name .. ")"
                 else
                     if not (aimbotEnabled and rmbDown and showAimbotTarget) then
                         aimbotTargetFrame.Visible = false
