@@ -31,6 +31,8 @@ local espEnabled, espNicksEnabled, espDistanceEnabled, espLifeEnabled, espGlowEn
 local teamCheck, wallCheck, aimbotEnabled, aimColorEnabled = false, false, false, false
 local showFov = true
 local showAimColorFov = true
+local showAimbotTarget = false
+local showAimColorTarget = false
 local targetPart, fovRadius, aimColorFovRadius = "Head", 150, 100
 local aimColorPrediction, aimColorStrength = 0.08, 0.85
 local aimColorDisfarceEnabled, smoothingFactor, minimized, showFps, tpEnabled = false, 0.7, false, false, false
@@ -821,6 +823,21 @@ parentFovFrames()
 safeSpawn(function() safeWait(); parentFovFrames() end)
 safeSpawn(function() safeWait(); safeWait(); parentFovFrames() end)
 
+aimbotTargetFrame = Instance.new("TextLabel", ScreenGui)
+aimbotTargetFrame.Size = UDim2.new(0, 300, 0, 40)
+aimbotTargetFrame.Position = UDim2.new(0.5, -150, 0, 40)
+aimbotTargetFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+aimbotTargetFrame.BackgroundTransparency = 0.5
+aimbotTargetFrame.BorderSizePixel = 0
+aimbotTargetFrame.TextColor3 = Color3.fromRGB(255, 255, 255)
+aimbotTargetFrame.Font = Enum.Font.GothamBlack
+aimbotTargetFrame.TextSize = 16
+aimbotTargetFrame.TextXAlignment = Enum.TextXAlignment.Center
+aimbotTargetFrame.Visible = false
+aimbotTargetFrame.ZIndex = 50
+aimbotTargetFrame.Text = ""
+aimbotTargetLabel = aimbotTargetFrame
+
 local colorMenuTitle = nil
 
 local function updateAllDynamicColors(color)
@@ -1564,12 +1581,14 @@ end)
 
 createToggleButton(AimbotLeftFrame, "Aimbot", function() return aimbotEnabled end, function() aimbotEnabled = not aimbotEnabled end)
 createToggleButton(AimbotLeftFrame, "Exibir FOV", function() return showFov end, function() showFov = not showFov end)
+createToggleButton(AimbotLeftFrame, "Mostrar Alvo", function() return showAimbotTarget end, function() showAimbotTarget = not showAimbotTarget end)
 createSlider(AimbotRightFrame, "FOV Aimbot", 50, 500, fovRadius, function(v) fovRadius = v end)
 createSlider(AimbotRightFrame, "Suavizacao Aimbot", 0, 10, smoothingFactor * 10, function(v) smoothingFactor = v / 10 end)
 
 createToggleButton(AimColorLeftFrame, "AimColor", function() return aimColorEnabled end, function() aimColorEnabled = not aimColorEnabled end)
 createToggleButton(AimColorLeftFrame, "Exibir FOV AimColor", function() return showAimColorFov end, function() showAimColorFov = not showAimColorFov end)
 createToggleButton(AimColorLeftFrame, "AimColor Disfarce", function() return aimColorDisfarceEnabled end, function() aimColorDisfarceEnabled = not aimColorDisfarceEnabled end)
+createToggleButton(AimColorLeftFrame, "Mostrar Alvo", function() return showAimColorTarget end, function() showAimColorTarget = not showAimColorTarget end)
 createSlider(AimColorRightFrame, "FOV AimColor", 20, 500, aimColorFovRadius, function(v) aimColorFovRadius = v end)
 createSlider(AimColorRightFrame, "Forca AimColor", 5, 100, aimColorStrength * 100, function(v) aimColorStrength = v / 100 end)
 createSlider(AimColorRightFrame, "Predicao AimColor", 0, 500, aimColorPrediction * 1000, function(v) aimColorPrediction = v / 1000 end)
@@ -1672,19 +1691,40 @@ RunService.RenderStepped:Connect(function()
     end
 
     local rmbDown = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
-    
+    local lmbDown = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+
+    -- AIMBOT (BOTÃO DIREITO - SÓ NA PARTE ESCOLHIDA)
     if aimbotEnabled and rmbDown and not overPanel then
         local target, tp = getClosestPart(fovRadius)
         if target then
             smoothLookAt(target)
+            if showAimbotTarget and tp then
+                aimbotTargetFrame.Visible = true
+                aimbotTargetFrame.Text = "Aimbot: " .. tp.Name .. " (" .. target.Name .. ")"
+            else
+                aimbotTargetFrame.Visible = false
+            end
+        else
+            aimbotTargetFrame.Visible = false
+        end
+    else
+        if not (aimColorEnabled and lmbDown and showAimColorTarget) then
+            aimbotTargetFrame.Visible = false
         end
     end
 
-    if aimColorEnabled and rmbDown and not overPanel then
-        local parts = {"Head", "UpperTorso", "Torso", "HumanoidRootPart"}
+    -- AIMCOLOR (BOTÃO ESQUERDO)
+    if aimColorEnabled and lmbDown and not overPanel then
+        local parts
+        if aimColorDisfarceEnabled then
+            parts = {"Head", "UpperTorso", "Torso", "HumanoidRootPart"}
+        else
+            parts = {targetPart}
+        end
+
         local mp = UserInputService:GetMouseLocation()
         local center = Vector2.new(mp.X, mp.Y)
-        local closest = nil
+        local closest, closestPlayer = nil, nil
         local shortest = aimColorFovRadius
         
         for _, p in ipairs(Players:GetPlayers()) do
@@ -1700,6 +1740,7 @@ RunService.RenderStepped:Connect(function()
                                     if d < shortest then 
                                         shortest = d
                                         closest = part
+                                        closestPlayer = p
                                     end
                                 end
                             end
@@ -1709,16 +1750,27 @@ RunService.RenderStepped:Connect(function()
             end
         end
 
-        if closest then
+        if closest and closestPlayer then
             local pos = closest.Position
             local sp, on = Camera:WorldToViewportPoint(pos)
             if on then
+                if showAimColorTarget then
+                    aimbotTargetFrame.Visible = true
+                    aimbotTargetFrame.Text = "AimColor: " .. closestPlayer.Name .. " (" .. closest.Name .. ")"
+                else
+                    if not (aimbotEnabled and rmbDown and showAimbotTarget) then
+                        aimbotTargetFrame.Visible = false
+                    end
+                end
+
+                local dx = sp.X - mp.X
+                local dy = sp.Y - mp.Y
                 local finalStrength = aimColorDisfarceEnabled and 0.3 or 1.0
                 
                 if setmousepos then
-                    setmousepos(mp.X + ((sp.X - mp.X) * finalStrength), mp.Y + ((sp.Y - mp.Y) * finalStrength))
+                    setmousepos(mp.X + (dx * finalStrength), mp.Y + (dy * finalStrength))
                 elseif mousemoverel then
-                    mousemoverel((sp.X - mp.X) * finalStrength, (sp.Y - mp.Y) * finalStrength)
+                    mousemoverel(dx * finalStrength, dy * finalStrength)
                 end
                 
                 if not aimColorDisfarceEnabled and tick() >= nextFireTime then
@@ -1730,6 +1782,10 @@ RunService.RenderStepped:Connect(function()
                     nextFireTime = tick() + 0.1
                 end
             end
+        end
+    else
+        if not (aimbotEnabled and rmbDown and showAimbotTarget) then
+            aimbotTargetFrame.Visible = false
         end
     end
 end)
