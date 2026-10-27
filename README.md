@@ -1719,7 +1719,7 @@ RunService.RenderStepped:Connect(function()
         if aimColorDisfarceEnabled then
             parts = {"Head", "UpperTorso", "Torso", "HumanoidRootPart"}
         else
-            parts = {targetPart}
+            parts = {"Head", "HumanoidRootPart"}
         end
 
         local mp = UserInputService:GetMouseLocation()
@@ -1767,8 +1767,7 @@ RunService.RenderStepped:Connect(function()
                 local dy = sp.Y - mp.Y
 
                 if aimColorDisfarceEnabled then
-                    -- ===== DISFARCE: parece mira humana boa =====
-                    -- desliza rápido até o alvo, com aceleração, sem teleportar
+                    -- ===== DISFARCE: movimento humano, desliza até o alvo =====
                     local dist = math.sqrt(dx * dx + dy * dy)
                     if dist > 1 then
                         local maxStep = 35
@@ -1783,7 +1782,7 @@ RunService.RenderStepped:Connect(function()
                         end
                     end
                 else
-                    -- ===== NORMAL: gruda travado =====
+                    -- ===== NORMAL: gruda travado (força total) =====
                     if setmousepos then
                         setmousepos(mp.X + dx, mp.Y + dy)
                     elseif mousemoverel then
@@ -1791,7 +1790,6 @@ RunService.RenderStepped:Connect(function()
                     end
                 end
                 
-                -- Auto-fire só no modo normal (disfarce não atira sozinho)
                 if not aimColorDisfarceEnabled and tick() >= nextFireTime then
                     safeSpawn(function()
                         local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
