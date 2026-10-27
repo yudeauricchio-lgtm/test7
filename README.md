@@ -669,8 +669,7 @@ KeyMenu = Instance.new("Frame", ScreenGui)
 KeyMenu.Size = UDim2.new(0, 250, 0, 120)
 KeyMenu.BackgroundColor3 = COLORS.PRIMARY
 KeyMenu.BackgroundTransparency = 0.5
-KeyMenu.BorderSizePixel = 0
-KeyMenu.Visible = false
+KeyMenu.BorderSizePixel = 0KeyMenu.Visible = false
 KeyMenu.ZIndex = 10
 local KeyMenuCorner = Instance.new("UICorner", KeyMenu)
 KeyMenuCorner.CornerRadius = UDim.new(0, 8)
@@ -1784,7 +1783,7 @@ RunService.RenderStepped:Connect(function()
 
                 local dx = sp.X - mp.X
                 local dy = sp.Y - mp.Y
-                local finalStrength = aimColorDisfarceEnabled and (aimColorStrength * 0.3) or 1.0
+                local finalStrength = aimColorDisfarceEnabled and 0.3 or 1.0
                 
                 if setmousepos then
                     setmousepos(mp.X + (dx * finalStrength), mp.Y + (dy * finalStrength))
