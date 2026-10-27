@@ -1691,7 +1691,7 @@ RunService.RenderStepped:Connect(function()
     end
 
     local rmbDown = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
-    local lmbDown = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+    local lmbDown = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) or mouse1Down
 
     -- AIMBOT (BOTÃO DIREITO - SÓ NA PARTE ESCOLHIDA)
     if aimbotEnabled and rmbDown and not overPanel then
