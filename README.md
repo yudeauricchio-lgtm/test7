@@ -31,8 +31,6 @@ local espEnabled, espNicksEnabled, espDistanceEnabled, espLifeEnabled, espGlowEn
 local teamCheck, wallCheck, aimbotEnabled, aimColorEnabled = false, false, false, false
 local showFov = true
 local showAimColorFov = true
-local showAimbotTarget = false
-local showAimColorTarget = false
 local targetPart, fovRadius, aimColorFovRadius = "Head", 150, 100
 local aimColorPrediction, aimColorStrength = 0.08, 0.85
 local aimColorDisfarceEnabled, smoothingFactor, minimized, showFps, tpEnabled = false, 0.7, false, false, false
@@ -86,34 +84,6 @@ local function limparRotulos()
 end
 
 safeSpawn(function() safeWait(); limparRotulos() end)
-
-local function getDisfarceParts()
-    local parts = {"Head", "HumanoidRootPart"}
-    local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-    if hum and hum.RigType == Enum.HumanoidRigType.R6 then
-        table.insert(parts, "Torso")
-        table.insert(parts, "Left Arm")
-        table.insert(parts, "Right Arm")
-        table.insert(parts, "Left Leg")
-        table.insert(parts, "Right Leg")
-    else
-        table.insert(parts, "UpperTorso")
-        table.insert(parts, "LowerTorso")
-        table.insert(parts, "LeftUpperArm")
-        table.insert(parts, "LeftLowerArm")
-        table.insert(parts, "LeftHand")
-        table.insert(parts, "RightUpperArm")
-        table.insert(parts, "RightLowerArm")
-        table.insert(parts, "RightHand")
-        table.insert(parts, "LeftUpperLeg")
-        table.insert(parts, "LeftLowerLeg")
-        table.insert(parts, "LeftFoot")
-        table.insert(parts, "RightUpperLeg")
-        table.insert(parts, "RightLowerLeg")
-        table.insert(parts, "RightFoot")
-    end
-    return parts
-end
 
 local mouseMoveFunc = nil
 if mousemoverel then
@@ -851,38 +821,6 @@ parentFovFrames()
 safeSpawn(function() safeWait(); parentFovFrames() end)
 safeSpawn(function() safeWait(); safeWait(); parentFovFrames() end)
 
-aimbotTargetFrame = Instance.new("TextLabel", AimColorTabFrame)
-aimbotTargetFrame.Name = "AlvoDisplay"
-aimbotTargetFrame.Size = UDim2.new(1, -10, 0, 24)
-aimbotTargetFrame.Position = UDim2.new(0, 5, 1, -30)
-aimbotTargetFrame.BackgroundColor3 = COLORS.SECONDARY
-aimbotTargetFrame.BackgroundTransparency = 0.5
-aimbotTargetFrame.BorderSizePixel = 0
-aimbotTargetFrame.Text = ""
-aimbotTargetFrame.TextColor3 = Color3.fromRGB(255, 255, 255)
-aimbotTargetFrame.Font = Enum.Font.GothamBlack
-aimbotTargetFrame.TextSize = 13
-aimbotTargetFrame.TextXAlignment = Enum.TextXAlignment.Center
-aimbotTargetFrame.Visible = false
-aimbotTargetFrame.ZIndex = 10
-aimbotTargetLabel = aimbotTargetFrame
-
-local function createFPSDisplay()
-    if fpsLabel then pcall(function() fpsLabel:Destroy() end); fpsLabel = nil end
-    if not showFps then return end
-    local lbl = Instance.new("TextLabel", ScreenGui)
-    lbl.Size = UDim2.new(0, 100, 0, 20)
-    lbl.Position = UDim2.new(1, -110, 0, 10)
-    lbl.BackgroundTransparency = 1
-    lbl.TextColor3 = currentTitleColor
-    lbl.Font = Enum.Font.GothamBlack
-    lbl.TextSize = 16
-    lbl.TextXAlignment = Enum.TextXAlignment.Right
-    lbl.Text = "FPS: 0"
-    lbl.ZIndex = 100
-    fpsLabel = lbl
-end
-
 local colorMenuTitle = nil
 
 local function updateAllDynamicColors(color)
@@ -1448,7 +1386,8 @@ local function clearAllESP()
 end
 
 local function updateESPTexts()
-    if not espEnabled then return end    for p, d in pairs(espBillboardObjects) do
+    if not espEnabled then return end
+    for p, d in pairs(espBillboardObjects) do
         if not p.Character or d.character ~= p.Character then
             removeESP(p)
             if p.Character then createESP(p) end
@@ -1551,6 +1490,22 @@ local function smoothLookAt(target)
     local targetCF = CFrame.new(camPos, camPos + dir.Unit)
     local alpha = math.clamp(1 - smoothingFactor, 0.05, 1)
     Camera.CFrame = Camera.CFrame:Lerp(targetCF, alpha)
+end
+
+local function createFPSDisplay()
+    if fpsLabel then pcall(function() fpsLabel:Destroy() end); fpsLabel = nil end
+    if not showFps then return end
+    local lbl = Instance.new("TextLabel", ScreenGui)
+    lbl.Size = UDim2.new(0, 100, 0, 20)
+    lbl.Position = UDim2.new(1, -110, 0, 10)
+    lbl.BackgroundTransparency = 1
+    lbl.TextColor3 = currentTitleColor
+    lbl.Font = Enum.Font.GothamBlack
+    lbl.TextSize = 16
+    lbl.TextXAlignment = Enum.TextXAlignment.Right
+    lbl.Text = "FPS: 0"
+    lbl.ZIndex = 100
+    fpsLabel = lbl
 end
 
 createToggleButton(ESPTabFrame, "ESP", function() return espEnabled end, function()
@@ -1717,6 +1672,7 @@ RunService.RenderStepped:Connect(function()
     end
 
     local rmbDown = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+    
     if aimbotEnabled and rmbDown and not overPanel then
         local target, tp = getClosestPart(fovRadius)
         if target then
@@ -1724,7 +1680,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- ===== AIMCOLOR (BOTÃO DIREITO) =====
     if aimColorEnabled and rmbDown and not overPanel then
         local parts = {"Head", "UpperTorso", "Torso", "HumanoidRootPart"}
         local mp = UserInputService:GetMouseLocation()
