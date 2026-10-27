@@ -1177,7 +1177,9 @@ local function updateLifeESP(player)
         humanoid = hum, rootPart = root,
         healthConnection = hconn, deathConnection = dconn, characterConn = cconn
     }
-    bb.Enabled = true
+    
+    local shouldShow = not (teamCheck and player.Team == LocalPlayer.Team)
+    bb.Enabled = shouldShow
     updateLifeVisual(player)
 end
 
@@ -1484,7 +1486,8 @@ local function updateAllESP()
                 if not lifeObjects[p] or not lifeObjects[p].billboard or not lifeObjects[p].billboard.Parent then
                     updateLifeESP(p)
                 else
-                    lifeObjects[p].billboard.Enabled = true
+                    local shouldShow = not (teamCheck and p.Team == LocalPlayer.Team)
+                    lifeObjects[p].billboard.Enabled = shouldShow
                     updateLifeVisual(p)
                 end
             end
@@ -1576,6 +1579,13 @@ createToggleButton(ESPTabFrame, "Verificar Time", function() return teamCheck en
     if espEnabled then updateAllESP() end
     if hitboxExpanderEnabled then applyHitboxToAll() end
     if espHitboxEnabled and espEnabled then updateAllESPHitbox() end
+    if espLifeEnabled and espEnabled then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and lifeObjects[p] and lifeObjects[p].billboard then
+                lifeObjects[p].billboard.Enabled = not (teamCheck and p.Team == LocalPlayer.Team)
+            end
+        end
+    end
 end)
 createToggleButton(ESPTabFrame, "Verificar Parede", function() return wallCheck end, function() wallCheck = not wallCheck end)
 
