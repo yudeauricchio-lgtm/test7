@@ -1719,7 +1719,7 @@ RunService.RenderStepped:Connect(function()
             smoothLookAt(target)
             if showAimbotTarget and tp then
                 aimbotTargetFrame.Visible = true
-                aimbotTargetLabel.Text = "Alvo: " .. tp.Name .. " (" .. target.Name .. ")"
+                aimbotTargetLabel.Text = "Aimbot: " .. tp.Name .. " (" .. target.Name .. ")"
             else
                 aimbotTargetFrame.Visible = false
             end
@@ -1734,7 +1734,8 @@ RunService.RenderStepped:Connect(function()
         local parts = {"Head", "UpperTorso", "Torso", "HumanoidRootPart"}
         local mp = UserInputService:GetMouseLocation()
         local center = Vector2.new(mp.X, mp.Y)
-        local closest, shortest = nil, aimColorFovRadius
+        local closest, closestPlayer = nil, nil
+        local shortest = aimColorFovRadius
         
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= LocalPlayer and p.Character then
@@ -1746,7 +1747,11 @@ RunService.RenderStepped:Connect(function()
                                 local pos, on = Camera:WorldToViewportPoint(part.Position)
                                 if on then
                                     local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                                    if d < shortest then shortest = d; closest = part end
+                                    if d < shortest then 
+                                        shortest = d
+                                        closest = part
+                                        closestPlayer = p
+                                    end
                                 end
                             end
                         end
@@ -1755,13 +1760,13 @@ RunService.RenderStepped:Connect(function()
             end
         end
 
-        if closest then
+        if closest and closestPlayer then
             local pos = closest.Position
             local sp, on = Camera:WorldToViewportPoint(pos)
             if on then
                 if showAimColorTarget then
                     aimbotTargetFrame.Visible = true
-                    aimbotTargetLabel.Text = "AimColor: " .. closest.Parent.Name .. " (" .. closest.Name .. ")"
+                    aimbotTargetLabel.Text = "AimColor: " .. closestPlayer.Name .. " (" .. closest.Name .. ")"
                 else
                     if not (aimbotEnabled and rmbDown and showAimbotTarget) then
                         aimbotTargetFrame.Visible = false
