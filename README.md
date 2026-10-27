@@ -37,7 +37,7 @@ local targetPart, fovRadius, aimColorFovRadius = "Head", 150, 100
 local aimColorPrediction, aimColorStrength = 0.08, 0.85
 local aimColorDisfarceEnabled, smoothingFactor, minimized, showFps, tpEnabled = false, 0.7, false, false, false
 local toggleKey, switchTargetKey = Enum.KeyCode.Insert, Enum.KeyCode.T
-local currentTitleColor = Color3.fromRGB(255, 140, 0)
+local currentTitleColor = Color3.fromRGB(0, 50, 150)
 local savedPosition, panelLoaded, anonimatoEnabled = nil, false, false
 local clickCount, lastClickTime, nextFireTime = 0, 0, 0
 local ignoreMouse1Release = false
@@ -207,8 +207,8 @@ end
 if not ScreenGui.Parent then return end
 
 MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 560, 0, 500)
-MainFrame.Position = UDim2.new(0.5, -280, 0.5, -250)
+MainFrame.Size = UDim2.new(0, 440, 0, 500)
+MainFrame.Position = UDim2.new(0.5, -220, 0.5, -250)
 MainFrame.BackgroundColor3 = COLORS.PRIMARY
 MainFrame.BackgroundTransparency = 0.6
 MainFrame.BorderSizePixel = 0
@@ -217,6 +217,13 @@ MainFrame.Visible = true
 
 local MainFrameCorner = Instance.new("UICorner", MainFrame)
 MainFrameCorner.CornerRadius = UDim.new(0, 12)
+
+-- Aura azul escuro em volta do painel
+local MainFrameAura = Instance.new("UIStroke", MainFrame)
+MainFrameAura.Color = Color3.fromRGB(0, 50, 150)
+MainFrameAura.Thickness = 3
+MainFrameAura.Transparency = 0.2
+MainFrameAura.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
 local TitleBar = Instance.new("Frame", MainFrame)
 TitleBar.Size = UDim2.new(1, 0, 0, 45)
@@ -239,8 +246,8 @@ Title.TextSize = 16
 Title.TextXAlignment = Enum.TextXAlignment.Left
 
 local CreditText = Instance.new("TextLabel", TitleBar)
-CreditText.Text = "by: machadinho900, zks_frozen"
-CreditText.Size = UDim2.new(0.25, 0, 1, 0)
+CreditText.Text = "By: SilentWears, w0trqxxxx"
+CreditText.Size = UDim2.new(0.4, 0, 1, 0)
 CreditText.Position = UDim2.new(0.35, 0, 0, 0)
 CreditText.BackgroundTransparency = 1
 CreditText.TextColor3 = currentTitleColor
@@ -348,7 +355,7 @@ local MinimizedCorner = Instance.new("UICorner", MinimizedFrame)
 MinimizedCorner.CornerRadius = UDim.new(0, 25)
 
 local MinimizedGhost = Instance.new("TextLabel", MinimizedFrame)
-MinimizedGhost.Text = "🪐"
+MinimizedGhost.Text = "🌀"
 MinimizedGhost.Size = UDim2.new(1, 0, 1, 0)
 MinimizedGhost.BackgroundTransparency = 1
 MinimizedGhost.TextColor3 = currentTitleColor
@@ -461,7 +468,7 @@ KeyPanelCorner.CornerRadius = UDim.new(0, 10)
 
 local KeyLabel = Instance.new("TextLabel", KeyPanel)
 KeyLabel.Text = "Tecla para minimizar:"
-KeyLabel.Size = UDim2.new(0, 150, 1, 0)
+KeyLabel.Size = UDim2.new(0, 130, 1, 0)
 KeyLabel.Position = UDim2.new(0, 10, 0, 0)
 KeyLabel.BackgroundTransparency = 1
 KeyLabel.TextColor3 = COLORS.TEXT
@@ -471,7 +478,7 @@ KeyLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 CurrentKeyButton = Instance.new("TextButton", KeyPanel)
 CurrentKeyButton.Size = UDim2.new(0, 80, 0, 28)
-CurrentKeyButton.Position = UDim2.new(0, 165, 0.5, -14)
+CurrentKeyButton.Position = UDim2.new(0, 145, 0.5, -14)
 CurrentKeyButton.BackgroundColor3 = currentTitleColor
 CurrentKeyButton.BorderSizePixel = 0
 CurrentKeyButton.Text = "Insert"
@@ -483,7 +490,7 @@ CurrentKeyCorner.CornerRadius = UDim.new(0, 6)
 
 ChangeKeyButton = Instance.new("TextButton", KeyPanel)
 ChangeKeyButton.Size = UDim2.new(0, 60, 0, 28)
-ChangeKeyButton.Position = UDim2.new(0, 255, 0.5, -14)
+ChangeKeyButton.Position = UDim2.new(0, 235, 0.5, -14)
 ChangeKeyButton.BackgroundColor3 = currentTitleColor
 ChangeKeyButton.BorderSizePixel = 0
 ChangeKeyButton.Text = "Mudar"
@@ -504,7 +511,7 @@ AimbotKeyPanelCorner.CornerRadius = UDim.new(0, 10)
 
 local AimbotKeyLabel = Instance.new("TextLabel", AimbotKeyPanel)
 AimbotKeyLabel.Text = "Tecla trocar alvo:"
-AimbotKeyLabel.Size = UDim2.new(0, 150, 1, 0)
+AimbotKeyLabel.Size = UDim2.new(0, 130, 1, 0)
 AimbotKeyLabel.Position = UDim2.new(0, 10, 0, 0)
 AimbotKeyLabel.BackgroundTransparency = 1
 AimbotKeyLabel.TextColor3 = COLORS.TEXT
@@ -514,7 +521,7 @@ AimbotKeyLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 CurrentAimbotKeyButton = Instance.new("TextButton", AimbotKeyPanel)
 CurrentAimbotKeyButton.Size = UDim2.new(0, 80, 0, 28)
-CurrentAimbotKeyButton.Position = UDim2.new(0, 165, 0.5, -14)
+CurrentAimbotKeyButton.Position = UDim2.new(0, 145, 0.5, -14)
 CurrentAimbotKeyButton.BackgroundColor3 = currentTitleColor
 CurrentAimbotKeyButton.BorderSizePixel = 0
 CurrentAimbotKeyButton.Text = "T"
@@ -526,7 +533,7 @@ CurrentAimbotKeyCorner.CornerRadius = UDim.new(0, 6)
 
 ChangeAimbotKeyButton = Instance.new("TextButton", AimbotKeyPanel)
 ChangeAimbotKeyButton.Size = UDim2.new(0, 60, 0, 28)
-ChangeAimbotKeyButton.Position = UDim2.new(0, 255, 0.5, -14)
+ChangeAimbotKeyButton.Position = UDim2.new(0, 235, 0.5, -14)
 ChangeAimbotKeyButton.BackgroundColor3 = currentTitleColor
 ChangeAimbotKeyButton.BorderSizePixel = 0
 ChangeAimbotKeyButton.Text = "Mudar"
@@ -613,7 +620,7 @@ TabBar.ZIndex = 100
 
 local function createTabButton(parent, text, position, onClick)
     local b = Instance.new("TextButton", parent)
-    b.Size = UDim2.new(0, 100, 1, 0)
+    b.Size = UDim2.new(0, 85, 1, 0)
     b.Position = position
     b.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
     b.BackgroundTransparency = 0.3
@@ -621,7 +628,7 @@ local function createTabButton(parent, text, position, onClick)
     b.Text = text
     b.TextColor3 = COLORS.TEXT
     b.Font = Enum.Font.GothamBlack
-    b.TextSize = 12
+    b.TextSize = 11
     b.AutoButtonColor = false
     b.ZIndex = 101
     local c = Instance.new("UICorner", b)
@@ -630,11 +637,11 @@ local function createTabButton(parent, text, position, onClick)
     return b
 end
 
-ESPTabButton = createTabButton(TabBar, "ESP", UDim2.new(0, 10, 0, 0), function() showTab("ESP") end)
-ExtraTabButton = createTabButton(TabBar, "Extra", UDim2.new(0, 120, 0, 0), function() showTab("Extra") end)
-AimColorTabButton = createTabButton(TabBar, "AimColor", UDim2.new(0, 230, 0, 0), function() showTab("AimColor") end)
-AimbotTabButton = createTabButton(TabBar, "Aimbot", UDim2.new(0, 340, 0, 0), function() showTab("Aimbot") end)
-HitboxTabButton = createTabButton(TabBar, "Hitbox", UDim2.new(0, 450, 0, 0), function() showTab("Hitbox") end)
+ESPTabButton = createTabButton(TabBar, "ESP", UDim2.new(0, 5, 0, 0), function() showTab("ESP") end)
+ExtraTabButton = createTabButton(TabBar, "Extra", UDim2.new(0, 95, 0, 0), function() showTab("Extra") end)
+AimColorTabButton = createTabButton(TabBar, "AimColor", UDim2.new(0, 185, 0, 0), function() showTab("AimColor") end)
+AimbotTabButton = createTabButton(TabBar, "Aimbot", UDim2.new(0, 275, 0, 0), function() showTab("Aimbot") end)
+HitboxTabButton = createTabButton(TabBar, "Hitbox", UDim2.new(0, 365, 0, 0), function() showTab("Hitbox") end)
 
 showTab("ESP")
 
@@ -852,6 +859,7 @@ local function updateAllDynamicColors(color)
     for _, s in pairs(sliderFills) do pcall(function() s.BackgroundColor3 = color end) end
     if fovFrame then setCircleColor(fovFrame, color) end
     if aimColorFovFrame then setCircleColor(aimColorFovFrame, color) end
+    if MainFrameAura then MainFrameAura.Color = color end
 end
 
 local function startRgbMode()
@@ -1427,8 +1435,7 @@ local function updateESPTexts()
 end
 
 local function updateAllESP()
-    if not espEnabled then return end
-    for _, p in ipairs(Players:GetPlayers()) do
+    if not espEnabled then return end    for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer then
             if not espBillboardObjects[p] then createESP(p) end
             if espGlowEnabled then updateGlowForPlayer(p) end
