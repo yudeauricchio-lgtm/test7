@@ -23,7 +23,7 @@ RunService.Heartbeat:Connect(function()
     heartbeatTasks = {}
     for _, fn in ipairs(queue) do
         local ok, err = pcall(fn)
-        if not ok then warn("[Blackhole]", err) end
+        if not ok then warn("[Abyssal]", err) end
     end
 end)
 
@@ -60,6 +60,8 @@ local selectorButtons = {}
 local sliderFills = {}
 
 local ScreenGui, MainFrame, MinimizedFrame, ColorMenu, KeyMenu, AimbotKeyMenu = nil, nil, nil, nil, nil, nil
+local MainFrameAura = nil
+local MainFrameAuraGradient = nil
 local ChangeColorButton, ChangeKeyButton, ChangeAimbotKeyButton = nil, nil, nil
 local CurrentKeyButton, CurrentAimbotKeyButton, CurrentColorButton = nil, nil, nil
 local AnonimatoButton, AnonimatoIndicator = nil, nil
@@ -194,7 +196,7 @@ local TITLE_COLORS = {
 }
 
 ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "BlackholeProject"
+ScreenGui.Name = "AbyssalProject"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.IgnoreGuiInset = true
@@ -218,12 +220,21 @@ MainFrame.Visible = true
 local MainFrameCorner = Instance.new("UICorner", MainFrame)
 MainFrameCorner.CornerRadius = UDim.new(0, 12)
 
--- Aura azul escuro em volta do painel
-local MainFrameAura = Instance.new("UIStroke", MainFrame)
-MainFrameAura.Color = Color3.fromRGB(0, 50, 150)
+-- Aura degradê azul escuro em volta do painel (UIStroke + UIGradient)
+MainFrameAura = Instance.new("UIStroke", MainFrame)
 MainFrameAura.Thickness = 3
-MainFrameAura.Transparency = 0.2
+MainFrameAura.Transparency = 0.1
 MainFrameAura.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+MainFrameAuraGradient = Instance.new("UIGradient", MainFrameAura)
+MainFrameAuraGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0.00, Color3.fromRGB(0, 25, 80)),
+    ColorSequenceKeypoint.new(0.25, Color3.fromRGB(0, 60, 170)),
+    ColorSequenceKeypoint.new(0.50, Color3.fromRGB(0, 100, 230)),
+    ColorSequenceKeypoint.new(0.75, Color3.fromRGB(0, 60, 170)),
+    ColorSequenceKeypoint.new(1.00, Color3.fromRGB(0, 25, 80))
+})
+MainFrameAuraGradient.Rotation = 0
 
 local TitleBar = Instance.new("Frame", MainFrame)
 TitleBar.Size = UDim2.new(1, 0, 0, 45)
@@ -236,8 +247,8 @@ local TitleBarCorner = Instance.new("UICorner", TitleBar)
 TitleBarCorner.CornerRadius = UDim.new(0, 12)
 
 local Title = Instance.new("TextLabel", TitleBar)
-Title.Text = "Blackhole Project"
-Title.Size = UDim2.new(0.5, 0, 1, 0)
+Title.Text = "Abyssal Project"
+Title.Size = UDim2.new(0.4, 0, 1, 0)
 Title.Position = UDim2.new(0, 15, 0, 0)
 Title.BackgroundTransparency = 1
 Title.TextColor3 = currentTitleColor
@@ -246,13 +257,13 @@ Title.TextSize = 16
 Title.TextXAlignment = Enum.TextXAlignment.Left
 
 local CreditText = Instance.new("TextLabel", TitleBar)
-CreditText.Text = "By: SilentWears, w0trqxxxx"
+CreditText.Text = "By: SilentWears, W0rtqxxxx"
 CreditText.Size = UDim2.new(0.4, 0, 1, 0)
-CreditText.Position = UDim2.new(0.35, 0, 0, 0)
+CreditText.Position = UDim2.new(0.42, 0, 0, 0)
 CreditText.BackgroundTransparency = 1
 CreditText.TextColor3 = currentTitleColor
 CreditText.Font = Enum.Font.GothamBlack
-CreditText.TextSize = 12
+CreditText.TextSize = 9
 CreditText.TextXAlignment = Enum.TextXAlignment.Left
 
 local MinimizeButton = Instance.new("TextButton", TitleBar)
@@ -620,7 +631,7 @@ TabBar.ZIndex = 100
 
 local function createTabButton(parent, text, position, onClick)
     local b = Instance.new("TextButton", parent)
-    b.Size = UDim2.new(0, 85, 1, 0)
+    b.Size = UDim2.new(0, 80, 1, 0)
     b.Position = position
     b.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
     b.BackgroundTransparency = 0.3
@@ -637,11 +648,11 @@ local function createTabButton(parent, text, position, onClick)
     return b
 end
 
-ESPTabButton = createTabButton(TabBar, "ESP", UDim2.new(0, 5, 0, 0), function() showTab("ESP") end)
-ExtraTabButton = createTabButton(TabBar, "Extra", UDim2.new(0, 95, 0, 0), function() showTab("Extra") end)
-AimColorTabButton = createTabButton(TabBar, "AimColor", UDim2.new(0, 185, 0, 0), function() showTab("AimColor") end)
-AimbotTabButton = createTabButton(TabBar, "Aimbot", UDim2.new(0, 275, 0, 0), function() showTab("Aimbot") end)
-HitboxTabButton = createTabButton(TabBar, "Hitbox", UDim2.new(0, 365, 0, 0), function() showTab("Hitbox") end)
+ESPTabButton = createTabButton(TabBar, "ESP", UDim2.new(0, 6, 0, 0), function() showTab("ESP") end)
+ExtraTabButton = createTabButton(TabBar, "Extra", UDim2.new(0, 90, 0, 0), function() showTab("Extra") end)
+AimColorTabButton = createTabButton(TabBar, "AimColor", UDim2.new(0, 174, 0, 0), function() showTab("AimColor") end)
+AimbotTabButton = createTabButton(TabBar, "Aimbot", UDim2.new(0, 258, 0, 0), function() showTab("Aimbot") end)
+HitboxTabButton = createTabButton(TabBar, "Hitbox", UDim2.new(0, 342, 0, 0), function() showTab("Hitbox") end)
 
 showTab("ESP")
 
@@ -774,7 +785,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- ===== CONTROLE REAL DO BOTÃO ESQUERDO (XENO-COMPATÍVEL) =====
 do
     local mouse = LocalPlayer:GetMouse()
     if mouse then
@@ -859,7 +869,6 @@ local function updateAllDynamicColors(color)
     for _, s in pairs(sliderFills) do pcall(function() s.BackgroundColor3 = color end) end
     if fovFrame then setCircleColor(fovFrame, color) end
     if aimColorFovFrame then setCircleColor(aimColorFovFrame, color) end
-    if MainFrameAura then MainFrameAura.Color = color end
 end
 
 local function startRgbMode()
@@ -1435,7 +1444,8 @@ local function updateESPTexts()
 end
 
 local function updateAllESP()
-    if not espEnabled then return end    for _, p in ipairs(Players:GetPlayers()) do
+    if not espEnabled then return end
+    for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer then
             if not espBillboardObjects[p] then createESP(p) end
             if espGlowEnabled then updateGlowForPlayer(p) end
@@ -1640,6 +1650,11 @@ RunService.RenderStepped:Connect(function()
     local mousePos = UserInputService:GetMouseLocation()
     local overPanel = isMouseOverPanel()
 
+    -- Anima a aura (degradê girando)
+    if MainFrameAuraGradient and MainFrameAura and MainFrameAura.Parent then
+        MainFrameAuraGradient.Rotation = (MainFrameAuraGradient.Rotation + 0.4) % 360
+    end
+
     if tick() - espUpdateTimer >= 0.5 then
         espUpdateTimer = tick()
         limparRotulos()
@@ -1713,7 +1728,6 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- AIMCOLOR (BOTÃO ESQUERDO) - usa lmbDown (Mouse.Button1Down/Up)
     if aimColorEnabled and lmbDown and not overPanel then
         local parts
         if aimColorDisfarceEnabled then
