@@ -40,7 +40,6 @@ local toggleKey, switchTargetKey = Enum.KeyCode.Insert, Enum.KeyCode.T
 local currentTitleColor = Color3.fromRGB(255, 140, 0)
 local savedPosition, panelLoaded, anonimatoEnabled = nil, false, false
 local clickCount, lastClickTime, nextFireTime = 0, 0, 0
-local mouse1Down = false
 local ignoreMouse1Release = false
 local frameCount, lastTime, currentFps, fpsLabel, espUpdateTimer = 0, tick(), 0, nil, 0
 
@@ -740,9 +739,6 @@ ChangeAimbotKeyButton.MouseButton1Click:Connect(function()
 end)
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        mouse1Down = true
-    end
     if gameProcessed then return end
     if input.KeyCode == toggleKey then
         if anonimatoEnabled then
@@ -766,18 +762,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             local p = m.Hit.p
             LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(p.X, p.Y + 3, p.Z)
         end
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input, gameProcessed)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        mouse1Down = true
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input, gameProcessed)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 and not ignoreMouse1Release then
-        mouse1Down = false
     end
 end)
 
@@ -1691,7 +1675,8 @@ RunService.RenderStepped:Connect(function()
     end
 
     local rmbDown = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
-    local lmbDown = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) or mouse1Down
+    -- CORREÇÃO: lê SÓ o estado real do botão esquerdo (segurou = true, soltou = false)
+    local lmbDown = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
 
     -- AIMBOT (BOTÃO DIREITO - SÓ NA PARTE ESCOLHIDA)
     if aimbotEnabled and rmbDown and not overPanel then
@@ -1767,7 +1752,6 @@ RunService.RenderStepped:Connect(function()
                 local dy = sp.Y - mp.Y
 
                 if aimColorDisfarceEnabled then
-                    -- ===== DISFARCE: movimento humano, desliza até o alvo =====
                     local dist = math.sqrt(dx * dx + dy * dy)
                     if dist > 1 then
                         local maxStep = 35
@@ -1782,7 +1766,6 @@ RunService.RenderStepped:Connect(function()
                         end
                     end
                 else
-                    -- ===== NORMAL: gruda travado (força total) =====
                     if setmousepos then
                         setmousepos(mp.X + dx, mp.Y + dy)
                     elseif mousemoverel then
