@@ -34,7 +34,7 @@ local showAimColorFov = true
 local showAimbotTarget = false
 local showAimColorTarget = false
 local targetPart, fovRadius, aimColorFovRadius = "Head", 150, 100
-local aimColorPrediction, aimColorStrength = 0.08, 0.85
+local aimColorPrediction, aimColorStrength = 0.0, 0.85
 local aimColorDisfarceEnabled, smoothingFactor, minimized, showFps, tpEnabled = false, 0.7, false, false, false
 local toggleKey, switchTargetKey = Enum.KeyCode.Insert, Enum.KeyCode.T
 local currentTitleColor = Color3.fromRGB(0, 50, 150)
@@ -76,9 +76,63 @@ local usingRgb = false
 local rgbHue = 0
 local rgbConnection = nil
 
--- Rastreamento de posição anterior do alvo (para predição)
-local lastAimbotTargetPos = nil
-local lastAimbotTargetTime = nil
+-- ============================================================
+-- VELOCIDADE SUAVIZADA POR PLAYER (filtro passa-baixa)
+-- Usa HumanoidRootPart (estável), não a parte do corpo (que
+-- oscila com animação e causava tremor no Aimbot)
+-- ============================================================
+local playerVelocityCache = {}
+local VELOCITY_ALPHA = 0.15  -- 0.15 = bem suave, 0.5 = mais responsivo
+
+local function updatePlayerVelocity(player)
+    local char = player.Character
+    if not char then return Vector3.new(0,0,0) end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return Vector3.new(0,0,0) end
+
+    local rawVel = root.AssemblyLinearVelocity or root.Velocity or Vector3.new(0,0,0)
+    local cached = playerVelocityCache[player]
+    if not cached then
+        playerVelocityCache[player] = { vel = rawVel, time = tick() }
+        return rawVel
+    end
+    -- Filtro passa-baixa: vel = vel_antiga * (1-alpha) + nova * alpha
+    local smoothed = cached.vel:Lerp(rawVel, VELOCITY_ALPHA)
+    cached.vel = smoothed
+    cached.time = tick()
+    return smoothed
+end
+
+local function getSmoothedVelocity(player)
+    local c = playerVelocityCache[player]
+    if c then return c.vel end
+    return Vector3.new(0,0,0)
+end
+
+-- ============================================================
+-- TRACKING SUAVE (relativo, com deadzone real)
+-- ============================================================
+local function smoothTrackScreenPoint(targetX, targetY, maxStep, accelMin, curveDiv, deadzone)
+    local mp = UserInputService:GetMouseLocation()
+    local dx = targetX - mp.X
+    local dy = targetY - mp.Y
+    local dist = math.sqrt(dx * dx + dy * dy)
+    local dz = deadzone or 2
+    if dist <= dz then return end
+
+    local t = math.clamp(dist / curveDiv, 0, 1)
+    local strength = math.max(accelMin, t)
+    local step = math.min(dist, maxStep) * strength
+
+    local nx = dx / dist
+    local ny = dy / dist
+
+    if mousemoverel then
+        mousemoverel(nx * step, ny * step)
+    elseif setmousepos then
+        setmousepos(mp.X + nx * step, mp.Y + ny * step)
+    end
+end
 
 local function limparRotulos()
     for _, p in ipairs(Players:GetPlayers()) do
@@ -1513,36 +1567,6 @@ local function getClosestPart(radius)
     return cp, cplr
 end
 
--- ============================================================
--- TRACKING SUAVE E ESTÁVEL (usado pelo Aimbot)
--- - Usa mousemoverel (relativo) quando disponível -> sem tremor
--- - Zona morta: se dist < deadzone, NÃO move (evita micro-tremor)
--- - Passo limitado por frame (sem overshoot)
--- - Nunca "crava e para": sempre mantém passo mínimo enquanto longe
--- ============================================================
-local function smoothTrackScreenPoint(targetX, targetY, maxStep, accelMin, curveDiv, deadzone)
-    local mp = UserInputService:GetMouseLocation()
-    local dx = targetX - mp.X
-    local dy = targetY - mp.Y
-    local dist = math.sqrt(dx * dx + dy * dy)
-    local dz = deadzone or 2
-    if dist <= dz then return end  -- zona morta: não move nada (sem tremor)
-
-    local t = math.clamp(dist / curveDiv, 0, 1)
-    local strength = math.max(accelMin, t)
-    local step = math.min(dist, maxStep) * strength
-
-    local nx = dx / dist
-    local ny = dy / dist
-
-    -- Prefere mousemoverel (relativo) — não "teleporta" e não briga com o mouse
-    if mousemoverel then
-        mousemoverel(nx * step, ny * step)
-    elseif setmousepos then
-        setmousepos(mp.X + nx * step, mp.Y + ny * step)
-    end
-end
-
 local function createFPSDisplay()
     if fpsLabel then pcall(function() fpsLabel:Destroy() end); fpsLabel = nil end
     if not showFps then return end
@@ -1665,8 +1689,12 @@ Players.PlayerRemoving:Connect(function(p)
         espHitboxObjects[p] = nil
     end
     hitboxOriginalSizes[p] = nil
+    playerVelocityCache[p] = nil
 end)
 
+-- ============================================================
+-- RENDER STEPPED — só UI, ESP, FOV e FPS
+-- ============================================================
 RunService.RenderStepped:Connect(function()
     if not panelLoaded then return end
     local mousePos = UserInputService:GetMouseLocation()
@@ -1727,37 +1755,51 @@ RunService.RenderStepped:Connect(function()
             fpsLabel.Text = ("FPS: %d"):format(currentFps)
         end
     end
+end)
 
+-- ============================================================
+-- HEARTBEAT — AIMBOT + AIMCOLOR em TEMPO REAL
+-- Roda DEPOIS da física/física do personagem, com posições
+-- atualizadas. Elimina o delay do RenderStepped.
+-- ============================================================
+RunService.Heartbeat:Connect(function(dt)
+    if not panelLoaded then return end
+    if not (aimbotEnabled or aimColorEnabled) then return end
+
+    local overPanel = isMouseOverPanel()
     local rmbDown = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
 
+    -- Atualiza velocidade suavizada de todos os players (para predição)
+    if aimbotEnabled or aimColorEnabled then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then updatePlayerVelocity(p) end
+        end
+    end
+
     -- ============================================================
-    -- AIMBOT (RMB) — tracking estável, com predição e zona morta
+    -- AIMBOT (RMB) — suave, com predição de velocidade estabilizada
     -- ============================================================
     if aimbotEnabled and rmbDown and not overPanel then
         local target, tp = getClosestPart(fovRadius)
-        if target then
-            -- Predição: estima onde o alvo estará no próximo frame
-            local now = tick()
+        if target and tp then
+            -- Predição usando a velocidade SUAVIZADA do HumanoidRootPart
+            -- (não da parte do corpo, que oscila com animação)
+            local vel = getSmoothedVelocity(tp)
             local worldPos = target.Position
-            if lastAimbotTargetPos and lastAimbotTargetTime and tp == aimbotTargetLabel then
-                -- (mantém compatibilidade; usa o próprio target)
-            end
-            -- Aplica predição baseada em velocity do alvo (se for BasePart)
-            local vel = target.AssemblyLinearVelocity or Vector3.new(0, 0, 0)
-            local predTime = aimColorPrediction  -- 0..0.5s
-            local predictedPos = worldPos + vel * predTime
+            local predictedPos = worldPos + vel * aimColorPrediction
 
             local sp, on = Camera:WorldToViewportPoint(predictedPos)
             if on then
-                -- Suavização do slider (0 = instantâneo, 1 = bem suave)
-                -- maxStep limitado para NÃO overshootar (causa tremor)
-                local maxStep  = math.clamp(70 * (1 - smoothingFactor * 0.6), 15, 70)
-                local accelMin = math.clamp(0.55 * (1 - smoothingFactor * 0.5), 0.2, 0.9)
-                local curveDiv = 90
-                local deadzone = 2
+                -- Suavização do slider: 0 = instantâneo, 1 = bem suave
+                -- maxStep limitado para não overshootar (causa tremor)
+                local maxStep  = math.clamp(50 * (1 - smoothingFactor * 0.5), 10, 50)
+                local accelMin = math.clamp(0.35 * (1 - smoothingFactor * 0.5), 0.10, 0.55)
+                local curveDiv = 100
+                local deadzone = 3  -- zona morta maior para não tremer
+
                 smoothTrackScreenPoint(sp.X, sp.Y, maxStep, accelMin, curveDiv, deadzone)
             end
-            if showAimbotTarget and tp then
+            if showAimbotTarget then
                 aimbotTargetFrame.Visible = true
                 aimbotTargetFrame.Text = "Aimbot: " .. tp.Name .. " (" .. target.Name .. ")"
             else
@@ -1773,16 +1815,27 @@ RunService.RenderStepped:Connect(function()
     end
 
     -- ============================================================
-    -- AIMCOLOR (LMB) — grude CONTÍNUO (não para quando chega no alvo)
+    -- AIMCOLOR (LMB) — grude CONTÍNUO em tempo real
     -- ============================================================
     if aimColorEnabled and lmbDown and not overPanel then
-        local parts = {"Head", "UpperTorso", "Torso", "HumanoidRootPart"}
+        -- Prioridade: Head > HumanoidRootPart > UpperTorso > Torso
+        -- No modo normal, SÓ usa Torso se a Head estiver bloqueada
+        local parts
+        if aimColorDisfarceEnabled then
+            parts = {"Head", "UpperTorso", "Torso", "HumanoidRootPart"}
+        else
+            -- NORMAL: prioriza Head, só cai para Root/Torso se Head bloqueada
+            parts = {"Head", "HumanoidRootPart", "UpperTorso", "Torso"}
+        end
 
         local mp = UserInputService:GetMouseLocation()
         local center = Vector2.new(mp.X, mp.Y)
         local closest, closestPlayer = nil, nil
         local shortest = aimColorFovRadius
-        
+        -- Prioridade por parte (menor = mais prioritário)
+        local partPriority = {Head = 1, HumanoidRootPart = 2, UpperTorso = 3, Torso = 4}
+        local bestPriority = 999
+
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= LocalPlayer and p.Character then
                 if not teamCheck or p.Team ~= LocalPlayer.Team then
@@ -1793,10 +1846,13 @@ RunService.RenderStepped:Connect(function()
                                 local pos, on = Camera:WorldToViewportPoint(part.Position)
                                 if on then
                                     local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                                    if d < shortest then 
+                                    local prio = partPriority[pn] or 5
+                                    -- Só troca se: prioridade melhor, OU mesma prioridade e mais perto
+                                    if d < shortest and (prio < bestPriority or (prio == bestPriority and d < shortest)) then
                                         shortest = d
                                         closest = part
                                         closestPlayer = p
+                                        bestPriority = prio
                                     end
                                 end
                             end
@@ -1807,8 +1863,8 @@ RunService.RenderStepped:Connect(function()
         end
 
         if closest and closestPlayer then
-            -- Predição: mira onde o alvo vai estar (evita atraso e "soltar")
-            local vel = closest.AssemblyLinearVelocity or Vector3.new(0, 0, 0)
+            -- Predição (padrão 0 = tempo real, sem atraso)
+            local vel = getSmoothedVelocity(closestPlayer)
             local predictedPos = closest.Position + vel * aimColorPrediction
 
             local sp, on = Camera:WorldToViewportPoint(predictedPos)
@@ -1827,25 +1883,24 @@ RunService.RenderStepped:Connect(function()
                 local dist = math.sqrt(dx * dx + dy * dy)
 
                 -- TRACKING CONTÍNUO — nunca "crava e para"
-                -- Não há mais "if dist <= X then step = dist" porque isso
-                -- fazia o cursor parar no alvo. Agora sempre mantém um passo
-                -- mínimo (minStep) enquanto houver distância > deadzone.
+                -- Sem "if dist <= X then step = dist".
+                -- minStep garante que continua acompanhando o alvo em movimento.
                 if dist > 0.5 then
                     local maxStep, accelMin, curveDiv, minStep, deadzone
                     if aimColorDisfarceEnabled then
                         -- DISFARCE: mira humana muito boa, suave e natural
                         maxStep   = 22
-                        accelMin  = 0.35
-                        curveDiv  = 140
-                        minStep   = 0.6   -- sempre acompanha, nunca para
+                        accelMin  = 0.40
+                        curveDiv  = 120
+                        minStep   = 0.8
                         deadzone  = 1.5
                     else
-                        -- NORMAL: grude FORTE e CONTÍNUO
+                        -- NORMAL: grude FORTE e CONTÍNUO, tempo real
                         maxStep   = 120
-                        accelMin  = 0.96
-                        curveDiv  = 22
-                        minStep   = 2.0   -- sempre acompanha, nunca para
-                        deadzone  = 1.0
+                        accelMin  = 0.97
+                        curveDiv  = 18
+                        minStep   = 3.0
+                        deadzone  = 0.8
                     end
 
                     if dist > deadzone then
@@ -1859,7 +1914,6 @@ RunService.RenderStepped:Connect(function()
                         local nx = dx / dist
                         local ny = dy / dist
 
-                        -- Prefere mousemoverel (relativo) — evita tremor
                         if mousemoverel then
                             mousemoverel(nx * step, ny * step)
                         elseif setmousepos then
