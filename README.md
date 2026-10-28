@@ -76,6 +76,34 @@ local usingRgb = false
 local rgbHue = 0
 local rgbConnection = nil
 
+-- ===== FUNÇÃO DE DETECÇÃO DO BOTÃO ESQUERDO (TENTA TODAS AS OPÇÕES) =====
+local function isLeftMouseDown()
+    -- 1) Funções nativas do executor (as mais confiáveis no Xeno)
+    if ismouse1pressed then
+        local ok, r = pcall(ismouse1pressed)
+        if ok and r then return true end
+    end
+    if isMouse1Down then
+        local ok, r = pcall(isMouse1Down)
+        if ok and r then return true end
+    end
+    if isMouseButtonPressed then
+        local ok, r = pcall(isMouseButtonPressed, 1)
+        if ok and r then return true end
+    end
+    if ismouse1clicked then
+        -- não usar, só clique
+    end
+    -- 2) Estado que a gente mantém via eventos
+    if lmbDown then return true end
+    -- 3) Fallback do Roblox (pode não funcionar no Xeno)
+    local ok, r = pcall(function()
+        return UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+    end)
+    if ok and r then return true end
+    return false
+end
+
 local function limparRotulos()
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character then
@@ -220,7 +248,6 @@ MainFrame.Visible = true
 local MainFrameCorner = Instance.new("UICorner", MainFrame)
 MainFrameCorner.CornerRadius = UDim.new(0, 12)
 
--- Aura degradê azul escuro em volta do painel (UIStroke + UIGradient)
 MainFrameAura = Instance.new("UIStroke", MainFrame)
 MainFrameAura.Thickness = 3
 MainFrameAura.Transparency = 0.1
@@ -785,12 +812,19 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
+-- Eventos que atualizam lmbDown (redundância para garantir)
 do
     local mouse = LocalPlayer:GetMouse()
     if mouse then
         mouse.Button1Down:Connect(function() lmbDown = true end)
         mouse.Button1Up:Connect(function() lmbDown = false end)
     end
+    UserInputService.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then lmbDown = true end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then lmbDown = false end
+    end)
 end
 
 local function createCircleFrame(name, radius, initialPos)
@@ -1650,7 +1684,6 @@ RunService.RenderStepped:Connect(function()
     local mousePos = UserInputService:GetMouseLocation()
     local overPanel = isMouseOverPanel()
 
-    -- Anima a aura (degradê girando)
     if MainFrameAuraGradient and MainFrameAura and MainFrameAura.Parent then
         MainFrameAuraGradient.Rotation = (MainFrameAuraGradient.Rotation + 0.4) % 360
     end
@@ -1709,6 +1742,9 @@ RunService.RenderStepped:Connect(function()
 
     local rmbDown = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
 
+    -- ===== DETECÇÃO DO BOTÃO ESQUERDO (TODAS AS FONTES) =====
+    local lmbNow = isLeftMouseDown()
+
     if aimbotEnabled and rmbDown and not overPanel then
         local target, tp = getClosestPart(fovRadius)
         if target then
@@ -1723,12 +1759,13 @@ RunService.RenderStepped:Connect(function()
             aimbotTargetFrame.Visible = false
         end
     else
-        if not (aimColorEnabled and lmbDown and showAimColorTarget) then
+        if not (aimColorEnabled and lmbNow and showAimColorTarget) then
             aimbotTargetFrame.Visible = false
         end
     end
 
-    if aimColorEnabled and lmbDown and not overPanel then
+    -- AIMCOLOR: gruda ENQUANTO segurar o botão esquerdo
+    if aimColorEnabled and lmbNow and not overPanel then
         local parts
         if aimColorDisfarceEnabled then
             parts = {"Head", "UpperTorso", "Torso", "HumanoidRootPart"}
