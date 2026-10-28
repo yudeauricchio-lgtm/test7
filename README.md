@@ -220,7 +220,6 @@ MainFrame.Visible = true
 local MainFrameCorner = Instance.new("UICorner", MainFrame)
 MainFrameCorner.CornerRadius = UDim.new(0, 12)
 
--- Aura degradê azul escuro em volta do painel (UIStroke + UIGradient)
 MainFrameAura = Instance.new("UIStroke", MainFrame)
 MainFrameAura.Thickness = 3
 MainFrameAura.Transparency = 0.1
@@ -1510,15 +1509,32 @@ local function getClosestPart(radius)
     return cp, cplr
 end
 
-local function smoothLookAt(target)
-    if not target then return end
-    local camPos = Camera.CFrame.Position
-    local targetPos = target.Position
-    local dir = (targetPos - camPos)
-    if dir.Magnitude < 0.1 then return end
-    local targetCF = CFrame.new(camPos, camPos + dir.Unit)
-    local alpha = math.clamp(1 - smoothingFactor, 0.05, 1)
-    Camera.CFrame = Camera.CFrame:Lerp(targetCF, alpha)
+-- ============================================================
+-- TRACKING SUAVE (usado pelo Aimbot RMB agora)
+-- Move o mouse em direção a um ponto de tela suavemente
+-- ============================================================
+local function smoothTrackScreenPoint(targetX, targetY, maxStep, accelMin, curveDiv)
+    local mp = UserInputService:GetMouseLocation()
+    local dx = targetX - mp.X
+    local dy = targetY - mp.Y
+    local dist = math.sqrt(dx * dx + dy * dy)
+    if dist <= 0.5 then return end
+
+    local t = math.clamp(dist / curveDiv, 0, 1)
+    local strength = math.max(accelMin, t)
+    local step = math.min(dist, maxStep) * strength
+    if dist <= 3 then step = dist end
+
+    local nx = dx / dist
+    local ny = dy / dist
+    local newX = mp.X + nx * step
+    local newY = mp.Y + ny * step
+
+    if setmousepos then
+        setmousepos(newX, newY)
+    elseif mousemoverel then
+        mousemoverel(nx * step, ny * step)
+    end
 end
 
 local function createFPSDisplay()
@@ -1650,7 +1666,6 @@ RunService.RenderStepped:Connect(function()
     local mousePos = UserInputService:GetMouseLocation()
     local overPanel = isMouseOverPanel()
 
-    -- Anima a aura (degradê girando)
     if MainFrameAuraGradient and MainFrameAura and MainFrameAura.Parent then
         MainFrameAuraGradient.Rotation = (MainFrameAuraGradient.Rotation + 0.4) % 360
     end
@@ -1709,10 +1724,21 @@ RunService.RenderStepped:Connect(function()
 
     local rmbDown = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
 
+    -- ============================================================
+    -- AIMBOT (RMB) — tracking suave no mouse, sem girar câmera
+    -- ============================================================
     if aimbotEnabled and rmbDown and not overPanel then
         local target, tp = getClosestPart(fovRadius)
         if target then
-            smoothLookAt(target)
+            local sp, on = Camera:WorldToViewportPoint(target.Position)
+            if on then
+                -- Suavização controlada pelo slider "Suavizacao Aimbot"
+                -- smoothingFactor: 0 = instantâneo, 1 = bem suave
+                local maxStep  = 60 * (1 - smoothingFactor * 0.7)
+                local accelMin = 0.5 * (1 - smoothingFactor * 0.5)
+                local curveDiv = 80
+                smoothTrackScreenPoint(sp.X, sp.Y, maxStep, accelMin, curveDiv)
+            end
             if showAimbotTarget and tp then
                 aimbotTargetFrame.Visible = true
                 aimbotTargetFrame.Text = "Aimbot: " .. tp.Name .. " (" .. target.Name .. ")"
@@ -1728,6 +1754,9 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
+    -- ============================================================
+    -- AIMCOLOR (LMB) — grude firme (normal) / natural (disfarce)
+    -- ============================================================
     if aimColorEnabled and lmbDown and not overPanel then
         local parts
         if aimColorDisfarceEnabled then
@@ -1779,30 +1808,40 @@ RunService.RenderStepped:Connect(function()
 
                 local dx = sp.X - mp.X
                 local dy = sp.Y - mp.Y
+                local dist = math.sqrt(dx * dx + dy * dy)
 
-                if aimColorDisfarceEnabled then
-                    local dist = math.sqrt(dx * dx + dy * dy)
-                    if dist > 1 then
-                        local maxStep = 35
-                        local accel = math.clamp(dist / 120, 0.35, 1)
-                        local step = math.min(dist, maxStep) * accel
-                        local nx = dx / dist
-                        local ny = dy / dist
-                        if setmousepos then
-                            setmousepos(mp.X + nx * step, mp.Y + ny * step)
-                        elseif mousemoverel then
-                            mousemoverel(nx * step, ny * step)
-                        end
+                -- LOCK/TRACKING SUAVE — igual nos dois modos, só muda a força
+                if dist > 0.5 then
+                    local maxStep, accelMin, curveDiv
+                    if aimColorDisfarceEnabled then
+                        -- DISFARCE: mira humana muito boa, suave e natural
+                        maxStep  = 22
+                        accelMin = 0.25
+                        curveDiv = 140
+                    else
+                        -- NORMAL: gruda firme, tracking agressivo sem teleporte
+                        maxStep  = 55
+                        accelMin = 0.55
+                        curveDiv = 60
                     end
-                else
+
+                    local t = math.clamp(dist / curveDiv, 0, 1)
+                    local strength = math.max(accelMin, t)
+                    local step = math.min(dist, maxStep) * strength
+                    if dist <= 3 then step = dist end
+
+                    local nx = dx / dist
+                    local ny = dy / dist
+
                     if setmousepos then
-                        setmousepos(mp.X + dx, mp.Y + dy)
+                        setmousepos(mp.X + nx * step, mp.Y + ny * step)
                     elseif mousemoverel then
-                        mousemoverel(dx, dy)
+                        mousemoverel(nx * step, ny * step)
                     end
                 end
-                
-                if not aimColorDisfarceEnabled and tick() >= nextFireTime then
+
+                -- AUTO-FIRE: só no AimColor normal, só quando já está no alvo
+                if not aimColorDisfarceEnabled and dist <= 2 and tick() >= nextFireTime then
                     safeSpawn(function()
                         local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
                         if tool then pcall(function() tool:Activate() end)
