@@ -40,7 +40,6 @@ local toggleKey, switchTargetKey = Enum.KeyCode.Insert, Enum.KeyCode.T
 local currentTitleColor = Color3.fromRGB(0, 50, 150)
 local savedPosition, panelLoaded, anonimatoEnabled = nil, false, false
 local clickCount, lastClickTime, nextFireTime = 0, 0, 0
-local ignoreMouse1Release = false
 local frameCount, lastTime, currentFps, fpsLabel, espUpdateTimer = 0, tick(), 0, nil, 0
 
 local lmbDown = false
@@ -136,8 +135,6 @@ local function limparRotulos()
         end
     end
 end
-
-safeSpawn(function() safeWait(); limparRotulos() end)
 
 local mouseMoveFunc = nil
 if mousemoverel then
