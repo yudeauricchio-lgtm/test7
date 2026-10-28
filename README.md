@@ -76,13 +76,8 @@ local usingRgb = false
 local rgbHue = 0
 local rgbConnection = nil
 
--- ============================================================
--- VELOCIDADE SUAVIZADA POR PLAYER (filtro passa-baixa)
--- Usa HumanoidRootPart (estável), não a parte do corpo (que
--- oscila com animação e causava tremor no Aimbot)
--- ============================================================
 local playerVelocityCache = {}
-local VELOCITY_ALPHA = 0.15  -- 0.15 = bem suave, 0.5 = mais responsivo
+local VELOCITY_ALPHA = 0.15
 
 local function updatePlayerVelocity(player)
     local char = player.Character
@@ -96,7 +91,6 @@ local function updatePlayerVelocity(player)
         playerVelocityCache[player] = { vel = rawVel, time = tick() }
         return rawVel
     end
-    -- Filtro passa-baixa: vel = vel_antiga * (1-alpha) + nova * alpha
     local smoothed = cached.vel:Lerp(rawVel, VELOCITY_ALPHA)
     cached.vel = smoothed
     cached.time = tick()
@@ -109,9 +103,6 @@ local function getSmoothedVelocity(player)
     return Vector3.new(0,0,0)
 end
 
--- ============================================================
--- TRACKING SUAVE (relativo, com deadzone real)
--- ============================================================
 local function smoothTrackScreenPoint(targetX, targetY, maxStep, accelMin, curveDiv, deadzone)
     local mp = UserInputService:GetMouseLocation()
     local dx = targetX - mp.X
@@ -1553,14 +1544,20 @@ local function getClosestPart(radius)
     local shortest = radius or fovRadius
     local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
     for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild(targetPart) then
-            if not isPlayerAlive(p) or not passesFilters(p) then continue end
+        if p ~= LocalPlayer and p.Character and isPlayerAlive(p) then
+            if not passesFilters(p) then continue end
             if teamCheck and p.Team == LocalPlayer.Team then continue end
-            local part = p.Character[targetPart]
-            local pos, on = Camera:WorldToViewportPoint(part.Position)
-            local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-            if on and d < shortest and isVisible(part) then
-                shortest = d; cp = part; cplr = p
+            for _, partName in ipairs(targetPartsList) do
+                local part = p.Character:FindFirstChild(partName)
+                if part and part:IsA("BasePart") then
+                    local pos, on = Camera:WorldToViewportPoint(part.Position)
+                    if on then
+                        local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                        if d < shortest and isVisible(part) then
+                            shortest = d; cp = part; cplr = p
+                        end
+                    end
+                end
             end
         end
     end
@@ -1692,9 +1689,6 @@ Players.PlayerRemoving:Connect(function(p)
     playerVelocityCache[p] = nil
 end)
 
--- ============================================================
--- RENDER STEPPED — só UI, ESP, FOV e FPS
--- ============================================================
 RunService.RenderStepped:Connect(function()
     if not panelLoaded then return end
     local mousePos = UserInputService:GetMouseLocation()
@@ -1757,11 +1751,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- ============================================================
--- HEARTBEAT — AIMBOT + AIMCOLOR em TEMPO REAL
--- Roda DEPOIS da física/física do personagem, com posições
--- atualizadas. Elimina o delay do RenderStepped.
--- ============================================================
 RunService.Heartbeat:Connect(function(dt)
     if not panelLoaded then return end
     if not (aimbotEnabled or aimColorEnabled) then return end
@@ -1769,33 +1758,24 @@ RunService.Heartbeat:Connect(function(dt)
     local overPanel = isMouseOverPanel()
     local rmbDown = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
 
-    -- Atualiza velocidade suavizada de todos os players (para predição)
     if aimbotEnabled or aimColorEnabled then
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= LocalPlayer then updatePlayerVelocity(p) end
         end
     end
 
-    -- ============================================================
-    -- AIMBOT (RMB) — suave, com predição de velocidade estabilizada
-    -- ============================================================
     if aimbotEnabled and rmbDown and not overPanel then
         local target, tp = getClosestPart(fovRadius)
-        if target and tp then
-            -- Predição usando a velocidade SUAVIZADA do HumanoidRootPart
-            -- (não da parte do corpo, que oscila com animação)
+        if target and tp and isPlayerAlive(tp) then
             local vel = getSmoothedVelocity(tp)
-            local worldPos = target.Position
-            local predictedPos = worldPos + vel * aimColorPrediction
+            local predictedPos = target.Position + vel * aimColorPrediction
 
             local sp, on = Camera:WorldToViewportPoint(predictedPos)
             if on then
-                -- Suavização do slider: 0 = instantâneo, 1 = bem suave
-                -- maxStep limitado para não overshootar (causa tremor)
                 local maxStep  = math.clamp(50 * (1 - smoothingFactor * 0.5), 10, 50)
                 local accelMin = math.clamp(0.35 * (1 - smoothingFactor * 0.5), 0.10, 0.55)
                 local curveDiv = 100
-                local deadzone = 3  -- zona morta maior para não tremer
+                local deadzone = 3
 
                 smoothTrackScreenPoint(sp.X, sp.Y, maxStep, accelMin, curveDiv, deadzone)
             end
@@ -1814,30 +1794,18 @@ RunService.Heartbeat:Connect(function(dt)
         end
     end
 
-    -- ============================================================
-    -- AIMCOLOR (LMB) — grude CONTÍNUO em tempo real
-    -- ============================================================
     if aimColorEnabled and lmbDown and not overPanel then
-        -- Prioridade: Head > HumanoidRootPart > UpperTorso > Torso
-        -- No modo normal, SÓ usa Torso se a Head estiver bloqueada
-        local parts
-        if aimColorDisfarceEnabled then
-            parts = {"Head", "UpperTorso", "Torso", "HumanoidRootPart"}
-        else
-            -- NORMAL: prioriza Head, só cai para Root/Torso se Head bloqueada
-            parts = {"Head", "HumanoidRootPart", "UpperTorso", "Torso"}
-        end
+        local parts = {"Head", "HumanoidRootPart"}
 
         local mp = UserInputService:GetMouseLocation()
         local center = Vector2.new(mp.X, mp.Y)
         local closest, closestPlayer = nil, nil
         local shortest = aimColorFovRadius
-        -- Prioridade por parte (menor = mais prioritário)
-        local partPriority = {Head = 1, HumanoidRootPart = 2, UpperTorso = 3, Torso = 4}
+        local partPriority = {Head = 1, HumanoidRootPart = 2}
         local bestPriority = 999
 
         for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character then
+            if p ~= LocalPlayer and p.Character and isPlayerAlive(p) then
                 if not teamCheck or p.Team ~= LocalPlayer.Team then
                     for _, pn in ipairs(parts) do
                         local part = p.Character:FindFirstChild(pn)
@@ -1847,7 +1815,6 @@ RunService.Heartbeat:Connect(function(dt)
                                 if on then
                                     local d = (Vector2.new(pos.X, pos.Y) - center).Magnitude
                                     local prio = partPriority[pn] or 5
-                                    -- Só troca se: prioridade melhor, OU mesma prioridade e mais perto
                                     if d < shortest and (prio < bestPriority or (prio == bestPriority and d < shortest)) then
                                         shortest = d
                                         closest = part
@@ -1862,8 +1829,7 @@ RunService.Heartbeat:Connect(function(dt)
             end
         end
 
-        if closest and closestPlayer then
-            -- Predição (padrão 0 = tempo real, sem atraso)
+        if closest and closestPlayer and isPlayerAlive(closestPlayer) then
             local vel = getSmoothedVelocity(closestPlayer)
             local predictedPos = closest.Position + vel * aimColorPrediction
 
@@ -1882,20 +1848,15 @@ RunService.Heartbeat:Connect(function(dt)
                 local dy = sp.Y - mp.Y
                 local dist = math.sqrt(dx * dx + dy * dy)
 
-                -- TRACKING CONTÍNUO — nunca "crava e para"
-                -- Sem "if dist <= X then step = dist".
-                -- minStep garante que continua acompanhando o alvo em movimento.
                 if dist > 0.5 then
                     local maxStep, accelMin, curveDiv, minStep, deadzone
                     if aimColorDisfarceEnabled then
-                        -- DISFARCE: mira humana muito boa, suave e natural
                         maxStep   = 22
                         accelMin  = 0.40
                         curveDiv  = 120
                         minStep   = 0.8
                         deadzone  = 1.5
                     else
-                        -- NORMAL: grude FORTE e CONTÍNUO, tempo real
                         maxStep   = 120
                         accelMin  = 0.97
                         curveDiv  = 18
@@ -1907,8 +1868,6 @@ RunService.Heartbeat:Connect(function(dt)
                         local t = math.clamp(dist / curveDiv, 0, 1)
                         local strength = math.max(accelMin, t)
                         local step = math.min(dist, maxStep) * strength
-                        -- GARANTE passo mínimo: se ficar muito perto, ainda
-                        -- empurra minStep para continuar colado no alvo em movimento
                         if step < minStep then step = math.min(dist, minStep) end
 
                         local nx = dx / dist
@@ -1922,7 +1881,6 @@ RunService.Heartbeat:Connect(function(dt)
                     end
                 end
 
-                -- AUTO-FIRE: só no AimColor normal, só quando já está no alvo
                 if not aimColorDisfarceEnabled and dist <= 2 and tick() >= nextFireTime then
                     safeSpawn(function()
                         local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
