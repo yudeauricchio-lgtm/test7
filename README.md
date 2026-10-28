@@ -76,6 +76,10 @@ local usingRgb = false
 local rgbHue = 0
 local rgbConnection = nil
 
+-- Rastreamento de posição anterior do alvo (para predição)
+local lastAimbotTargetPos = nil
+local lastAimbotTargetTime = nil
+
 local function limparRotulos()
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character then
@@ -1509,27 +1513,33 @@ local function getClosestPart(radius)
     return cp, cplr
 end
 
-local function smoothTrackScreenPoint(targetX, targetY, maxStep, accelMin, curveDiv)
+-- ============================================================
+-- TRACKING SUAVE E ESTÁVEL (usado pelo Aimbot)
+-- - Usa mousemoverel (relativo) quando disponível -> sem tremor
+-- - Zona morta: se dist < deadzone, NÃO move (evita micro-tremor)
+-- - Passo limitado por frame (sem overshoot)
+-- - Nunca "crava e para": sempre mantém passo mínimo enquanto longe
+-- ============================================================
+local function smoothTrackScreenPoint(targetX, targetY, maxStep, accelMin, curveDiv, deadzone)
     local mp = UserInputService:GetMouseLocation()
     local dx = targetX - mp.X
     local dy = targetY - mp.Y
     local dist = math.sqrt(dx * dx + dy * dy)
-    if dist <= 0.5 then return end
+    local dz = deadzone or 2
+    if dist <= dz then return end  -- zona morta: não move nada (sem tremor)
 
     local t = math.clamp(dist / curveDiv, 0, 1)
     local strength = math.max(accelMin, t)
     local step = math.min(dist, maxStep) * strength
-    if dist <= 3 then step = dist end
 
     local nx = dx / dist
     local ny = dy / dist
-    local newX = mp.X + nx * step
-    local newY = mp.Y + ny * step
 
-    if setmousepos then
-        setmousepos(newX, newY)
-    elseif mousemoverel then
+    -- Prefere mousemoverel (relativo) — não "teleporta" e não briga com o mouse
+    if mousemoverel then
         mousemoverel(nx * step, ny * step)
+    elseif setmousepos then
+        setmousepos(mp.X + nx * step, mp.Y + ny * step)
     end
 end
 
@@ -1721,17 +1731,31 @@ RunService.RenderStepped:Connect(function()
     local rmbDown = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
 
     -- ============================================================
-    -- AIMBOT (RMB) — tracking suave no mouse, sem girar câmera
+    -- AIMBOT (RMB) — tracking estável, com predição e zona morta
     -- ============================================================
     if aimbotEnabled and rmbDown and not overPanel then
         local target, tp = getClosestPart(fovRadius)
         if target then
-            local sp, on = Camera:WorldToViewportPoint(target.Position)
+            -- Predição: estima onde o alvo estará no próximo frame
+            local now = tick()
+            local worldPos = target.Position
+            if lastAimbotTargetPos and lastAimbotTargetTime and tp == aimbotTargetLabel then
+                -- (mantém compatibilidade; usa o próprio target)
+            end
+            -- Aplica predição baseada em velocity do alvo (se for BasePart)
+            local vel = target.AssemblyLinearVelocity or Vector3.new(0, 0, 0)
+            local predTime = aimColorPrediction  -- 0..0.5s
+            local predictedPos = worldPos + vel * predTime
+
+            local sp, on = Camera:WorldToViewportPoint(predictedPos)
             if on then
-                local maxStep  = 60 * (1 - smoothingFactor * 0.7)
-                local accelMin = 0.5 * (1 - smoothingFactor * 0.5)
-                local curveDiv = 80
-                smoothTrackScreenPoint(sp.X, sp.Y, maxStep, accelMin, curveDiv)
+                -- Suavização do slider (0 = instantâneo, 1 = bem suave)
+                -- maxStep limitado para NÃO overshootar (causa tremor)
+                local maxStep  = math.clamp(70 * (1 - smoothingFactor * 0.6), 15, 70)
+                local accelMin = math.clamp(0.55 * (1 - smoothingFactor * 0.5), 0.2, 0.9)
+                local curveDiv = 90
+                local deadzone = 2
+                smoothTrackScreenPoint(sp.X, sp.Y, maxStep, accelMin, curveDiv, deadzone)
             end
             if showAimbotTarget and tp then
                 aimbotTargetFrame.Visible = true
@@ -1749,13 +1773,9 @@ RunService.RenderStepped:Connect(function()
     end
 
     -- ============================================================
-    -- AIMCOLOR (LMB) — grude firme (normal) / natural (disfarce)
-    -- Mesmas partes do corpo nos dois modos. Só muda a força do grude.
+    -- AIMCOLOR (LMB) — grude CONTÍNUO (não para quando chega no alvo)
     -- ============================================================
     if aimColorEnabled and lmbDown and not overPanel then
-        -- MESMOS pontos para os dois modos (antes o normal só mirava
-        -- Head/HumanoidRootPart, e se o Head estivesse bloqueado o normal
-        -- "não grudava"). Agora ambos miram em todas as partes visíveis.
         local parts = {"Head", "UpperTorso", "Torso", "HumanoidRootPart"}
 
         local mp = UserInputService:GetMouseLocation()
@@ -1787,8 +1807,11 @@ RunService.RenderStepped:Connect(function()
         end
 
         if closest and closestPlayer then
-            local pos = closest.Position
-            local sp, on = Camera:WorldToViewportPoint(pos)
+            -- Predição: mira onde o alvo vai estar (evita atraso e "soltar")
+            local vel = closest.AssemblyLinearVelocity or Vector3.new(0, 0, 0)
+            local predictedPos = closest.Position + vel * aimColorPrediction
+
+            local sp, on = Camera:WorldToViewportPoint(predictedPos)
             if on then
                 if showAimColorTarget then
                     aimbotTargetFrame.Visible = true
@@ -1803,37 +1826,45 @@ RunService.RenderStepped:Connect(function()
                 local dy = sp.Y - mp.Y
                 local dist = math.sqrt(dx * dx + dy * dy)
 
-                -- TRACKING — igual nos dois modos, só muda a força do grude
+                -- TRACKING CONTÍNUO — nunca "crava e para"
+                -- Não há mais "if dist <= X then step = dist" porque isso
+                -- fazia o cursor parar no alvo. Agora sempre mantém um passo
+                -- mínimo (minStep) enquanto houver distância > deadzone.
                 if dist > 0.5 then
-                    local maxStep, accelMin, curveDiv
+                    local maxStep, accelMin, curveDiv, minStep, deadzone
                     if aimColorDisfarceEnabled then
                         -- DISFARCE: mira humana muito boa, suave e natural
-                        maxStep  = 22
-                        accelMin = 0.30
-                        curveDiv = 140
+                        maxStep   = 22
+                        accelMin  = 0.35
+                        curveDiv  = 140
+                        minStep   = 0.6   -- sempre acompanha, nunca para
+                        deadzone  = 1.5
                     else
-                        -- NORMAL: grude forte — quase cola no alvo
-                        -- accelMin alto (0.92) = puxa quase tudo por frame perto do alvo
-                        -- maxStep alto (90) = alcança longe rápido também
-                        -- curveDiv baixo (35) = força máxima já a partir de ~35px
-                        maxStep  = 90
-                        accelMin = 0.92
-                        curveDiv = 35
+                        -- NORMAL: grude FORTE e CONTÍNUO
+                        maxStep   = 120
+                        accelMin  = 0.96
+                        curveDiv  = 22
+                        minStep   = 2.0   -- sempre acompanha, nunca para
+                        deadzone  = 1.0
                     end
 
-                    local t = math.clamp(dist / curveDiv, 0, 1)
-                    local strength = math.max(accelMin, t)
-                    local step = math.min(dist, maxStep) * strength
-                    -- abaixo de 4px cola exato (mata qualquer micro-folga)
-                    if dist <= 4 then step = dist end
+                    if dist > deadzone then
+                        local t = math.clamp(dist / curveDiv, 0, 1)
+                        local strength = math.max(accelMin, t)
+                        local step = math.min(dist, maxStep) * strength
+                        -- GARANTE passo mínimo: se ficar muito perto, ainda
+                        -- empurra minStep para continuar colado no alvo em movimento
+                        if step < minStep then step = math.min(dist, minStep) end
 
-                    local nx = dx / dist
-                    local ny = dy / dist
+                        local nx = dx / dist
+                        local ny = dy / dist
 
-                    if setmousepos then
-                        setmousepos(mp.X + nx * step, mp.Y + ny * step)
-                    elseif mousemoverel then
-                        mousemoverel(nx * step, ny * step)
+                        -- Prefere mousemoverel (relativo) — evita tremor
+                        if mousemoverel then
+                            mousemoverel(nx * step, ny * step)
+                        elseif setmousepos then
+                            setmousepos(mp.X + nx * step, mp.Y + ny * step)
+                        end
                     end
                 end
 
