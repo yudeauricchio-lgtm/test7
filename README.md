@@ -1753,10 +1753,9 @@ RunService.RenderStepped:Connect(function()
     -- Mesmas partes do corpo nos dois modos. Só muda a força do grude.
     -- ============================================================
     if aimColorEnabled and lmbDown and not overPanel then
-        -- MESMOS pontos para os dois modos.
-        -- Antes o normal só mirava Head/HumanoidRootPart, e se o Head
-        -- estivesse bloqueado o normal "não grudava". Agora ambos miram
-        -- em todas as partes visíveis do corpo.
+        -- MESMOS pontos para os dois modos (antes o normal só mirava
+        -- Head/HumanoidRootPart, e se o Head estivesse bloqueado o normal
+        -- "não grudava"). Agora ambos miram em todas as partes visíveis.
         local parts = {"Head", "UpperTorso", "Torso", "HumanoidRootPart"}
 
         local mp = UserInputService:GetMouseLocation()
@@ -1813,16 +1812,20 @@ RunService.RenderStepped:Connect(function()
                         accelMin = 0.30
                         curveDiv = 140
                     else
-                        -- NORMAL: gruda firme, tracking agressivo sem teleporte
-                        maxStep  = 55
-                        accelMin = 0.70
-                        curveDiv = 60
+                        -- NORMAL: grude forte — quase cola no alvo
+                        -- accelMin alto (0.92) = puxa quase tudo por frame perto do alvo
+                        -- maxStep alto (90) = alcança longe rápido também
+                        -- curveDiv baixo (35) = força máxima já a partir de ~35px
+                        maxStep  = 90
+                        accelMin = 0.92
+                        curveDiv = 35
                     end
 
                     local t = math.clamp(dist / curveDiv, 0, 1)
                     local strength = math.max(accelMin, t)
                     local step = math.min(dist, maxStep) * strength
-                    if dist <= 2 then step = dist end
+                    -- abaixo de 4px cola exato (mata qualquer micro-folga)
+                    if dist <= 4 then step = dist end
 
                     local nx = dx / dist
                     local ny = dy / dist
