@@ -1509,10 +1509,6 @@ local function getClosestPart(radius)
     return cp, cplr
 end
 
--- ============================================================
--- TRACKING SUAVE (usado pelo Aimbot RMB agora)
--- Move o mouse em direção a um ponto de tela suavemente
--- ============================================================
 local function smoothTrackScreenPoint(targetX, targetY, maxStep, accelMin, curveDiv)
     local mp = UserInputService:GetMouseLocation()
     local dx = targetX - mp.X
@@ -1732,8 +1728,6 @@ RunService.RenderStepped:Connect(function()
         if target then
             local sp, on = Camera:WorldToViewportPoint(target.Position)
             if on then
-                -- Suavização controlada pelo slider "Suavizacao Aimbot"
-                -- smoothingFactor: 0 = instantâneo, 1 = bem suave
                 local maxStep  = 60 * (1 - smoothingFactor * 0.7)
                 local accelMin = 0.5 * (1 - smoothingFactor * 0.5)
                 local curveDiv = 80
@@ -1756,14 +1750,14 @@ RunService.RenderStepped:Connect(function()
 
     -- ============================================================
     -- AIMCOLOR (LMB) — grude firme (normal) / natural (disfarce)
+    -- Mesmas partes do corpo nos dois modos. Só muda a força do grude.
     -- ============================================================
     if aimColorEnabled and lmbDown and not overPanel then
-        local parts
-        if aimColorDisfarceEnabled then
-            parts = {"Head", "UpperTorso", "Torso", "HumanoidRootPart"}
-        else
-            parts = {"Head", "HumanoidRootPart"}
-        end
+        -- MESMOS pontos para os dois modos.
+        -- Antes o normal só mirava Head/HumanoidRootPart, e se o Head
+        -- estivesse bloqueado o normal "não grudava". Agora ambos miram
+        -- em todas as partes visíveis do corpo.
+        local parts = {"Head", "UpperTorso", "Torso", "HumanoidRootPart"}
 
         local mp = UserInputService:GetMouseLocation()
         local center = Vector2.new(mp.X, mp.Y)
@@ -1810,25 +1804,25 @@ RunService.RenderStepped:Connect(function()
                 local dy = sp.Y - mp.Y
                 local dist = math.sqrt(dx * dx + dy * dy)
 
-                -- LOCK/TRACKING SUAVE — igual nos dois modos, só muda a força
+                -- TRACKING — igual nos dois modos, só muda a força do grude
                 if dist > 0.5 then
                     local maxStep, accelMin, curveDiv
                     if aimColorDisfarceEnabled then
                         -- DISFARCE: mira humana muito boa, suave e natural
                         maxStep  = 22
-                        accelMin = 0.25
+                        accelMin = 0.30
                         curveDiv = 140
                     else
                         -- NORMAL: gruda firme, tracking agressivo sem teleporte
                         maxStep  = 55
-                        accelMin = 0.55
+                        accelMin = 0.70
                         curveDiv = 60
                     end
 
                     local t = math.clamp(dist / curveDiv, 0, 1)
                     local strength = math.max(accelMin, t)
                     local step = math.min(dist, maxStep) * strength
-                    if dist <= 3 then step = dist end
+                    if dist <= 2 then step = dist end
 
                     local nx = dx / dist
                     local ny = dy / dist
